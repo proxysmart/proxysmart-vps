@@ -1,0 +1,16 @@
+
+[Unit]
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/gost -L socks5://{{ VPS_SOCKS5_SERVER_LOGIN }}:{{ VPS_SOCKS5_SERVER_PASSWORD }}@:2323
+Type=simple
+Restart=always
+RestartSec=5
+StartLimitInterval=7200s
+StartLimitBurst=10000
+
+[Install]
+WantedBy=default.target
+
+

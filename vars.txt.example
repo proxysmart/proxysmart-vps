@@ -1,0 +1,6 @@
+
+haproxy_enabled: 1
+vps_socks5_udp:  1
+ssh_pub_keys: 
+ - PUBKEY
+

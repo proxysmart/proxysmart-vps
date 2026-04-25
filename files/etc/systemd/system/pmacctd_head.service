@@ -1,0 +1,14 @@
+
+[Unit]
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/pmacctd  -f /etc/pmacct/pmacctd_h.conf
+
+
+[Install]
+WantedBy=default.target
+
+
+

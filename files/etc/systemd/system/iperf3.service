@@ -1,0 +1,16 @@
+
+[Unit]
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/iperf3 -s -p 4999
+Type=simple
+Restart=always
+RestartSec=5
+StartLimitInterval=7200s
+StartLimitBurst=10000
+
+[Install]
+WantedBy=default.target
+
+

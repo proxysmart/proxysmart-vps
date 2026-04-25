@@ -1,0 +1,576 @@
+
+---
+- hosts: localhost
+  connection: local
+  become: True
+  gather_facts: True
+  vars:
+    # default variables, override in vars.txt
+    haproxy_enabled: 0
+    vps_socks5_udp:  0
+    ssh_pub_keys: []
+    VPS_SOCKS5_SERVER_LOGIN:        px
+    VPS_SOCKS5_SERVER_PASSWORD:     g739Az8JYK
+
+  vars_files:
+    - vars.txt
+
+  pre_tasks:
+    - name: Check if vars.txt exists
+      stat:
+        path: ./vars.txt
+      register: vars_file
+
+    - name: Fail if vars.txt is missing
+      fail:
+        msg: |
+          "vars.txt not found!
+           Please copy vars.txt.example to vars.txt and edit it with your values."
+      when: not vars_file.stat.exists
+
+  handlers:
+   - name: reload systemctl
+     command: systemctl daemon-reload
+     #when:   ansible_service_mgr == "systemd"
+
+   - name: nginx restart
+     systemd:
+        state: restarted
+        name: nginx
+
+   - name: pmacctd_head restart
+     systemd:
+        state: restarted
+        name: pmacctd_head
+
+   - name: rsyslog restart
+     systemd:
+        state: restarted
+        name: rsyslog
+
+   - name: haproxy restart
+     systemd:
+        state: restarted
+        name: haproxy
+
+   - name: sshd restart
+     systemd:
+        state: restarted
+        name: ssh
+
+   - name: caddy restart
+     systemd:
+        state: restarted
+        name: ssh
+
+   - name: gost_proxy restart
+     systemd:
+        state: restarted
+        name: gost_proxy
+        daemon_reload: yes
+
+   - name: iperf3 restart
+     systemd:
+        state: restarted
+        name: iperf3
+        daemon_reload: yes
+
+  tasks:
+
+   - name: Check OS name and version
+     assert:
+        that:
+          - ansible_facts['distribution'] == "Ubuntu"
+          - ansible_facts['distribution_version'] in ["22.04", "24.04"]
+        fail_msg: "Host must be Ubuntu 22.04 or 24.04"
+
+   - stat:
+        path: '/usr/local/bin/proxysmart.sh'
+     register: px
+
+   - name: check that it is not a Proxysmart server with modems.
+     assert:
+        that:
+          - not px.stat.exists
+        fail_msg: "---                  dont run it on a server with Proxysmart. Run it on a VPS!               -"
+
+   - name: check architecture
+     assert:
+        that:
+          - ansible_architecture == "x86_64"
+        fail_msg: "---                  a VPS with x86_64 is needed. Your VPS is {{ ansible_architecture }}"
+
+###### start check private IP
+
+   - name: Get default interface (if not provided)
+     command: ip route get 8.8.8.8
+     register: route_info
+     changed_when: false
+
+   - name: Set default interface fact
+     set_fact:
+        interface: "{{ route_info.stdout.split('dev')[1].split()[0] }}"
+
+   - name: Get IP address of main interface
+     command: ip -o -4 addr show dev {{ interface }} scope global
+     register: ip_info
+     changed_when: false
+
+   - name: Extract IP address
+     set_fact:
+        main_ip: "{{ ip_info.stdout | regex_search('\\d+\\.\\d+\\.\\d+\\.\\d+') }}"
+
+   #- set_fact: main_ip=10.23.23.233
+   - debug: var=main_ip
+
+   - name: Fail if main IP is private
+     fail:
+        msg: "Main IP {{ main_ip }} is private on interface {{ interface }}. Public IP is required."
+     when: main_ip is match('^(10\\.|192\\.168\\.|172\\.(1[6-9]|2[0-9]|3[0-1])\\.)')
+
+###### end check private IP
+
+   - name: install packages
+     tags: [ apt ]
+     apt:
+            name:
+                - cron
+                - logrotate
+                - sudo
+                - bash-completion
+                - bind9-host
+                - ca-certificates
+                - curl
+                - dnsutils
+                - git
+                - htop
+                - httping
+                - iftop
+                - iotop
+                - lftp
+                - lsof
+                - mtr-tiny
+                - net-tools
+                - nmap
+                - openssl
+                - psmisc
+                - pv
+                - rsync
+                - screen
+                - ssl-cert
+                - subversion
+                - swaks
+                - tcpdump
+                - telnet
+                - traceroute
+                - unzip
+                - usbutils
+                - vim
+                - wget
+                - whois
+                - zip
+                - iperf3
+                - rsyslog
+                - monitoring-plugins
+                - nginx
+            state: present
+            install_recommends: no
+
+   - name: remove packages
+     apt:
+            name:
+                - rpcbind
+                - needrestart
+                - ufw
+            state: absent
+
+   - name: nginx del default vhost
+     file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+     notify: [ nginx restart ] 
+
+   - name: set gost2 ver
+     set_fact:
+        GOST2_VER: 2.11.3
+     tags: gost2
+
+   - name: set gost2 arch
+     set_fact:
+        ARCH: linux-amd64
+     tags: [gost2]
+
+   - name: set gost2 url
+     set_fact:
+        gost2_url: 'https://github.com/ginuerzh/gost/releases/download/v{{GOST2_VER}}/gost-{{ARCH}}-{{GOST2_VER}}.gz'
+     tags: gost2
+
+   - name: Check if gost2 is installed
+     command: gost -V
+     register: gost2_version
+     ignore_errors: true
+     tags: gost2
+     changed_when: false
+     failed_when: false
+
+   - debug:
+        var: gost2_version
+     tags: gost2
+
+   - name: install gost2
+     shell:
+        cmd: "curl -L -m60 {{gost2_url}} | gunzip -dc > /usr/local/bin/gost.new && mv /usr/local/bin/gost.new /usr/local/bin/gost && chmod 755 /usr/local/bin/gost" 
+     tags: gost2
+     notify: [ gost_proxy restart ]
+     when: '( "msg" in gost2_version and "No such file or directory" in gost2_version.msg)  or ("stdout" in gost2_version and "{{ GOST2_VER }}" not in gost2_version.stdout)'
+
+   ###### gost3 :
+   - name: set gost3 arch
+     set_fact:
+        ARCH: linux_amd64
+     tags: [gost3]
+
+   - name: set gost3 ver
+     set_fact:
+        GOST3_VER: 3.0.0
+     tags: gost3
+
+   - name: set gost3 url
+     set_fact:
+        gost3_url: 'https://github.com/go-gost/gost/releases/download/v{{GOST3_VER}}/gost_{{GOST3_VER}}_{{ARCH}}.tar.gz'
+     tags: gost3
+
+   - name: Check if gost3 is installed
+     command: gost3 -V
+     register: gost3_version
+     ignore_errors: true
+     tags: gost3
+     changed_when: false
+     failed_when: false
+
+   - debug:
+        var: gost3_version
+     tags: gost3
+
+   - name: install gost3
+     shell:
+        cmd: "curl -L -m60 {{gost3_url}}  -o /tmp/gost3.tgz  && ls -lah /tmp/gost3.tgz && rm -rf /tmp/gost3/ && mkdir -p /tmp/gost3/ && tar xf /tmp/gost3.tgz -C /tmp/gost3/ && mv /tmp/gost3/gost /usr/local/bin/gost3"
+     tags: gost3
+     when: '( "msg" in gost3_version and "No such file or directory" in gost3_version.msg)  or ("stdout" in gost3_version and "{{ GOST3_VER }} " not in gost3_version.stdout)'
+
+    # end gost installation
+
+###### caddy installation :
+   - name: set caddy ver
+     set_fact:
+        CADDY_URL: "https://tun1.tanatos.org/repo/caddy/caddy-v2.10.0.x86_64"
+        CADDY_VER: 'v2.10.0 h1:fonubSaQKF1YANl8TXqGcn4IbIRUDdfAkpcsfI/vX5U='
+     tags: caddy
+
+   - name: Check if caddy is installed
+     command: caddy -v
+     register: caddy_version
+     ignore_errors: true
+     tags: caddy
+     changed_when: false
+     failed_when: false
+
+   - debug:
+        var: caddy_version
+     tags: caddy
+
+   - name: install caddy
+     shell:
+        cmd: "curl -L -m60 {{CADDY_URL}} -o /tmp/caddy && mv /tmp/caddy /usr/local/bin/caddy && chmod 755 /usr/local/bin/caddy && setcap 'cap_net_bind_service=+ep' /usr/local/bin/caddy "
+     tags: caddy
+     when: '( "msg" in caddy_version and "No such file or directory" in caddy_version.msg)  or ("stdout" in caddy_version and "{{ CADDY_VER }}" not in caddy_version.stdout)'
+
+   - name: Create caddy system user (no login)
+     tags: caddy
+     ansible.builtin.user:
+        name: caddy
+        shell: /usr/sbin/nologin
+        system: yes
+        create_home: yes
+        home:  /var/lib/caddy
+
+   - name: Create systemd service unit for Caddy
+     tags: caddy
+     notify: [ reload systemctl, caddy restart ]
+     copy:
+        dest: /etc/systemd/system/caddy.service
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Caddy Web Server
+          After=network.target
+
+          [Service]
+          User=caddy
+          Group=caddy
+          ExecStart=/usr/local/bin/caddy run --resume
+          Restart=on-failure
+          LimitNOFILE=1048576
+
+          [Install]
+          WantedBy=multi-user.target
+
+   - name: enable caddy.service
+     systemd:
+        name: caddy
+        enabled: yes
+        state: started
+     tags: caddy
+
+#    # end caddy installation
+
+   - name: create /etc/ssh/sshd_config.d
+     file:
+        path: /etc/ssh/sshd_config.d
+        state: directory
+
+   - name: set custom SSHD conf
+     copy:
+        dest: /etc/ssh/sshd_config.d/proxysmart.conf
+        content:  |
+            ClientAliveCountMax 3
+            ClientAliveInterval 3
+            GatewayPorts clientspecified
+            LoginGraceTime 10
+            MaxStartups 100:30:1000
+     notify: sshd restart
+     tags: ssh
+
+   - name: create user fwd
+     user:
+        name: fwd
+        shell: /bin/bash
+
+   - name: Set up multiple authorized keys for PROXYSMART boxes
+     tags: [ fwd, ssh ]
+     loop: "{{ ssh_pub_keys }}"
+     authorized_key:
+        user: fwd
+        key: "{{ item }}"
+
+   - name: create iperf service
+     notify: [ reload systemctl, iperf3 restart ]
+     template:
+        src: files/etc/systemd/system/iperf3.service
+        dest: /etc/systemd/system/iperf3.service
+     tags: iperf
+
+   - name: enable iperf service
+     systemd:
+        name: iperf3
+        enabled: yes
+        state: started
+        daemon_reload: yes
+     tags: iperf
+
+   - name: create gost_proxy.service (for VPN server UDP port exposing)
+     notify: [ reload systemctl, gost_proxy restart ]
+     template:
+        src: files/etc/systemd/system/gost_proxy.service
+        dest: /etc/systemd/system/gost_proxy.service
+     tags: vpn_i
+
+   - name: enable gost_proxy.service
+     systemd:
+        name: gost_proxy
+        enabled: yes
+        state: started
+     tags: vpn_i
+
+
+    ########## Gost / UDP start
+   - name: put Gost logrotate
+     tags: [ gost , logrotate ]
+     copy:
+        dest: /etc/logrotate.d/gost
+        content: |
+            /var/log/gost/*.log {
+                    missingok
+                    compress
+                    notifempty
+                    daily
+                    rotate 750
+                    copytruncate
+                    dateext
+                    dateformat -%Y-%m-%d_%H-%M-%S
+            }
+    ########## Gost / UDP end
+
+    ######## haproxy start
+   - name: install haproxy
+     tags: [ haproxy ]
+     apt:
+            name:
+                - haproxy
+            state: present
+            install_recommends: no
+     when:   haproxy_enabled == 1
+
+   - name: uninstall haproxy
+     tags: [ haproxy ]
+     apt:
+          name:
+              - haproxy
+          state: absent
+     when:   haproxy_enabled == 0
+
+   - name: put haproxy logrotate
+     tags: [ haproxy , logrotate ]
+     copy:
+        dest: /etc/logrotate.d/haproxy
+        content: |
+            /var/log/haproxy.log {
+                daily
+                rotate 750
+                missingok
+                notifempty
+                compress
+                postrotate
+                    /usr/lib/rsyslog/rsyslog-rotate
+                endscript
+            }
+     when:   haproxy_enabled == 1
+
+   - name: install haproxy
+     apt:
+            name:
+                - haproxy
+            state: present
+     when:   haproxy_enabled == 1
+     tags: [ haproxy ]
+
+   - name: create haproxy log if not exists
+     copy:
+        dest: /var/log/haproxy.log
+        owner: syslog
+        group: syslog
+        content: ""
+        force: false
+     tags: haproxy
+     notify: [ haproxy restart, rsyslog restart ]
+     when:   haproxy_enabled == 1
+
+   - set_fact:
+        haproxy_cfg_path: haproxy.cfg
+     tags: [ haproxy, fact ]
+
+   - name: copy haproxy conf
+     template:
+        src: files/haproxy/{{ haproxy_cfg_path }}
+        dest: /etc/haproxy/haproxy.cfg
+     notify: [ haproxy restart, rsyslog restart ]
+     tags: haproxy
+     when:   haproxy_enabled == 1
+
+
+   - name: copy rsyslog conf for haproxy
+     copy:
+        src: files/haproxy/49-haproxy.conf
+        dest: /etc/rsyslog.d/49-haproxy.conf
+     notify: [ haproxy restart, rsyslog restart ]
+     tags: haproxy
+     when:   haproxy_enabled == 1
+
+
+   - name: enable haproxy
+     systemd:
+        name: haproxy
+        enabled: yes
+        state: started
+     tags: haproxy
+     when:   haproxy_enabled == 1
+
+   - name: enable rsyslog
+     systemd:
+        name: rsyslog
+        enabled: yes
+        state: started
+     tags: haproxy
+    ######## haproxy end
+
+   - name: set sudoers
+     copy:
+        dest: /etc/sudoers.d/proxysmart
+        content:  |
+            fwd  ALL=NOPASSWD:  ALL
+        mode: 0400
+     tags: sudo
+
+   ############ Pmacct start
+
+   - name: install pmacct
+     tags: [ pmacct ]
+     apt:
+            name:
+                - pmacct
+            state: present
+            install_recommends: no
+
+   - name: put Pmacct logrotate
+     tags: [ pmacct, logrotate ]
+     copy:
+        dest: /etc/logrotate.d/pmacctd_head
+        content: |
+            /var/log/pmacct_head.json {
+                    missingok
+                    compress
+                    notifempty
+                    daily
+                    rotate {{ logrotate_days }}
+                    copytruncate
+            }
+            /var/log/pmacctd_h.log {
+                    missingok
+                    compress
+                    notifempty
+                    daily
+                    rotate 7
+                    copytruncate
+            }
+
+   - name: put Pmacct conf file
+     notify: [ pmacctd_head restart ]
+     copy:
+        src: files/etc/pmacct/pmacctd_h.conf
+        dest: /etc/pmacct/pmacctd_h.conf
+     tags: [ pmacct ]
+
+   - name: create Pmacct service
+     notify: [ reload systemctl, pmacctd_head restart ]
+     template:
+        src: files/etc/systemd/system/pmacctd_head.service
+        dest: /etc/systemd/system/pmacctd_head.service
+     tags: pmacct
+
+   - name: enable Pmacct service
+     systemd:
+        name: pmacctd_head
+        enabled: yes
+        state: started
+        daemon_reload: yes
+     tags: pmacct
+
+   - name: put vps helper
+     tags: files
+     copy:
+        src: files/usr/local/bin/vps_helper.sh
+        dest: /usr/local/bin/vps_helper.sh
+        mode: 0755
+
+   - name: cron, install vps helper
+     tags: cron
+     cron:
+        name: vps helper
+        job:  /usr/local/bin/vps_helper.sh purge_orphaned_socks_servers
+        minute: "12,42"
+        hour:   "*"
+
+   ############ Pmacct End
+
