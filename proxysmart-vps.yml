@@ -58,11 +58,6 @@
         state: restarted
         name: ssh
 
-   - name: caddy restart
-     systemd:
-        state: restarted
-        name: ssh
-
    - name: gost_proxy restart
      systemd:
         state: restarted
@@ -232,7 +227,7 @@
 
    - name: set gost3 ver
      set_fact:
-        GOST3_VER: 3.0.0
+        GOST3_VER: 3.0.0-rc8
      tags: gost3
 
    - name: set gost3 url
@@ -259,72 +254,6 @@
      when: '( "msg" in gost3_version and "No such file or directory" in gost3_version.msg)  or ("stdout" in gost3_version and "{{ GOST3_VER }} " not in gost3_version.stdout)'
 
     # end gost installation
-
-###### caddy installation :
-   - name: set caddy ver
-     set_fact:
-        CADDY_URL: "https://tun1.tanatos.org/repo/caddy/caddy-v2.10.0.x86_64"
-        CADDY_VER: 'v2.10.0 h1:fonubSaQKF1YANl8TXqGcn4IbIRUDdfAkpcsfI/vX5U='
-     tags: caddy
-
-   - name: Check if caddy is installed
-     command: caddy -v
-     register: caddy_version
-     ignore_errors: true
-     tags: caddy
-     changed_when: false
-     failed_when: false
-
-   - debug:
-        var: caddy_version
-     tags: caddy
-
-   - name: install caddy
-     shell:
-        cmd: "curl -L -m60 {{CADDY_URL}} -o /tmp/caddy && mv /tmp/caddy /usr/local/bin/caddy && chmod 755 /usr/local/bin/caddy && setcap 'cap_net_bind_service=+ep' /usr/local/bin/caddy "
-     tags: caddy
-     when: '( "msg" in caddy_version and "No such file or directory" in caddy_version.msg)  or ("stdout" in caddy_version and "{{ CADDY_VER }}" not in caddy_version.stdout)'
-
-   - name: Create caddy system user (no login)
-     tags: caddy
-     ansible.builtin.user:
-        name: caddy
-        shell: /usr/sbin/nologin
-        system: yes
-        create_home: yes
-        home:  /var/lib/caddy
-
-   - name: Create systemd service unit for Caddy
-     tags: caddy
-     notify: [ reload systemctl, caddy restart ]
-     copy:
-        dest: /etc/systemd/system/caddy.service
-        owner: root
-        group: root
-        mode: '0644'
-        content: |
-          [Unit]
-          Description=Caddy Web Server
-          After=network.target
-
-          [Service]
-          User=caddy
-          Group=caddy
-          ExecStart=/usr/local/bin/caddy run --resume
-          Restart=on-failure
-          LimitNOFILE=1048576
-
-          [Install]
-          WantedBy=multi-user.target
-
-   - name: enable caddy.service
-     systemd:
-        name: caddy
-        enabled: yes
-        state: started
-     tags: caddy
-
-#    # end caddy installation
 
    - name: create /etc/ssh/sshd_config.d
      file:
@@ -398,8 +327,6 @@
                     daily
                     rotate 750
                     copytruncate
-                    dateext
-                    dateformat -%Y-%m-%d_%H-%M-%S
             }
     ########## Gost / UDP end
 
@@ -556,21 +483,6 @@
         state: started
         daemon_reload: yes
      tags: pmacct
-
-   - name: put vps helper
-     tags: files
-     copy:
-        src: files/usr/local/bin/vps_helper.sh
-        dest: /usr/local/bin/vps_helper.sh
-        mode: 0755
-
-   - name: cron, install vps helper
-     tags: cron
-     cron:
-        name: vps helper
-        job:  /usr/local/bin/vps_helper.sh purge_orphaned_socks_servers
-        minute: "12,42"
-        hour:   "*"
 
    ############ Pmacct End
 
