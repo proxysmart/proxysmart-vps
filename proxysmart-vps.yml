@@ -64,7 +64,7 @@
    - name: caddy restart
      systemd:
         state: restarted
-        name: ssh
+        name: caddy
 
    - name: gost_proxy restart
      systemd:
@@ -312,9 +312,9 @@
                 }
             }
 
-            https://*.{AUTO_HTTPS_DOMAIN}:{AUTO_HTTPS_PORT}
+            https://*.{{AUTO_HTTPS_DOMAIN}}:{{AUTO_HTTPS_PORT}}
             {
-                reverse_proxy localhost:{AUTO_HTTPS_BACKEND_PORT}
+                reverse_proxy localhost:{{AUTO_HTTPS_BACKEND_PORT}}
                 tls {
                     on_demand
                 }
@@ -336,7 +336,7 @@
           [Service]
           User=caddy
           Group=caddy
-          ExecStart=/usr/local/bin/caddy run --config /etc/CaddyFile
+          ExecStart=/usr/local/bin/caddy run --config /etc/Caddyfile
           Restart=on-failure
           LimitNOFILE=1048576
 
