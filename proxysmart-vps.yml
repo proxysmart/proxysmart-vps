@@ -11,6 +11,9 @@
     ssh_pub_keys: []
     VPS_SOCKS5_SERVER_LOGIN:        px
     VPS_SOCKS5_SERVER_PASSWORD:     g739Az8JYK
+    AUTO_HTTPS_DOMAIN:          back.com
+    AUTO_HTTPS_BACKEND_PORT:    3082
+    AUTO_HTTPS_PORT:            7999
 
   vars_files:
     - vars.txt
@@ -294,6 +297,29 @@
         create_home: yes
         home:  /var/lib/caddy
 
+   - name: Create Caddy conf
+     tags: caddy
+     notify: [ caddy restart ]
+     copy:
+        dest: /etc/Caddyfile
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+            {
+                on_demand_tls {
+                    ask  http://httpbin.org/status/200 
+                }
+            }
+
+            https://*.{AUTO_HTTPS_DOMAIN}:{AUTO_HTTPS_PORT}
+            {
+                reverse_proxy localhost:{AUTO_HTTPS_BACKEND_PORT}
+                tls {
+                    on_demand
+                }
+            }
+
    - name: Create systemd service unit for Caddy
      tags: caddy
      notify: [ reload systemctl, caddy restart ]
@@ -310,7 +336,7 @@
           [Service]
           User=caddy
           Group=caddy
-          ExecStart=/usr/local/bin/caddy run --resume
+          ExecStart=/usr/local/bin/caddy run --config /etc/CaddyFile
           Restart=on-failure
           LimitNOFILE=1048576
 
