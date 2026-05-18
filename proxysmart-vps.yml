@@ -612,6 +612,14 @@
         virtualenv: /opt/webrelay.venv
         state: present
 
+   - name: put webrelay script
+     tags: webrelay
+     notify: [  webrelay restart ]
+     copy:
+        src: files/usr/local/bin/relay_server.py
+        dest: /usr/local/bin/relay_server.py
+        mode: 0755
+
    - name: Create systemd service unit for Webrelay
      tags: webrelay
      notify: [ reload systemctl, webrelay restart ]
