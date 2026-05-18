@@ -14,6 +14,7 @@
     AUTO_HTTPS_DOMAIN:          back.com
     AUTO_HTTPS_BACKEND_PORT:    3082
     AUTO_HTTPS_PORT:            7999
+    WEBRELAY_LISTEN_PORT:       2096
 
   vars_files:
     - vars.txt
@@ -77,6 +78,11 @@
         state: restarted
         name: iperf3
         daemon_reload: yes
+
+   - name: webrelay restart
+     systemd:
+        state: restarted
+        name: webrelay
 
   tasks:
 
@@ -597,6 +603,38 @@
         job:  /usr/local/bin/vps_helper.sh purge_orphaned_socks_servers
         minute: "12,42"
         hour:   "*"
+
+   - name: Setup Virtualenv and Install Modules
+     tags: webrelay
+     pip:
+        name: 
+          - websockets == 16.0
+        virtualenv: /opt/webrelay.venv
+        state: present
+
+   - name: Create systemd service unit for Webrelay
+     tags: webrelay
+     notify: [ reload systemctl, webrelay restart ]
+     copy:
+        dest: /etc/systemd/system/webrelay.service
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          [Unit]
+          After=network.target
+
+          [Service]
+          User=root
+          Group=root
+          Environment=PYTHONUNBUFFERED=1
+          ExecStart=/opt/webrelay.venv/bin/python3 /usr/local/bin/relay_server.py wss {{WEBRELAY_LISTEN_PORT}} {{AUTO_HTTPS_BACKEND_PORT}} -
+          Restart=on-failure
+          LimitNOFILE=1048576
+
+          [Install]
+          WantedBy=multi-user.target
+
 
    ############ Pmacct End
 
