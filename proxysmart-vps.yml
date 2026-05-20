@@ -275,28 +275,28 @@
      set_fact:
         CADDY_URL: "https://tun1.tanatos.org/repo/caddy/caddy-v2.10.0.x86_64"
         CADDY_VER: 'v2.10.0 h1:fonubSaQKF1YANl8TXqGcn4IbIRUDdfAkpcsfI/vX5U='
-     tags: caddy
+     tags: webrelay
 
    - name: Check if caddy is installed
      command: caddy -v
      register: caddy_version
      ignore_errors: true
-     tags: caddy
+     tags: webrelay
      changed_when: false
      failed_when: false
 
    - debug:
         var: caddy_version
-     tags: caddy
+     tags: webrelay
 
    - name: install caddy
      shell:
         cmd: "curl -L -m60 {{CADDY_URL}} -o /tmp/caddy && mv /tmp/caddy /usr/local/bin/caddy && chmod 755 /usr/local/bin/caddy && setcap 'cap_net_bind_service=+ep' /usr/local/bin/caddy "
-     tags: caddy
+     tags: webrelay
      when: '( "msg" in caddy_version and "No such file or directory" in caddy_version.msg)  or ("stdout" in caddy_version and "{{ CADDY_VER }}" not in caddy_version.stdout)'
 
    - name: Create caddy system user (no login)
-     tags: caddy
+     tags: webrelay
      ansible.builtin.user:
         name: caddy
         shell: /usr/sbin/nologin
@@ -305,7 +305,7 @@
         home:  /var/lib/caddy
 
    - name: Create Caddy conf
-     tags: caddy
+     tags: webrelay
      notify: [ caddy restart ]
      copy:
         dest: /etc/Caddyfile
@@ -330,7 +330,7 @@
             }
 
    - name: Create systemd service unit for Caddy
-     tags: caddy
+     tags: webrelay
      notify: [ reload systemctl, caddy restart ]
      copy:
         dest: /etc/systemd/system/caddy.service
@@ -357,7 +357,7 @@
         name: caddy
         enabled: yes
         state: started
-     tags: caddy
+     tags: webrelay
 
 #    # end caddy installation
 
