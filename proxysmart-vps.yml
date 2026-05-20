@@ -321,7 +321,9 @@
 
             https://*.{{AUTO_HTTPS_DOMAIN}}:{{AUTO_HTTPS_PORT}}
             {
-                reverse_proxy localhost:{{AUTO_HTTPS_BACKEND_PORT}}
+                reverse_proxy localhost:{{AUTO_HTTPS_BACKEND_PORT}} {
+                    header_up X-Real-IP {remote_host}
+                }
                 tls {
                     on_demand
                 }
