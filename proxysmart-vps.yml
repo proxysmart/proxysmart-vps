@@ -644,6 +644,13 @@
           [Install]
           WantedBy=multi-user.target
 
+   - name: enable Webrelay service
+     systemd:
+        name: webrelay
+        enabled: yes
+        state: started
+        daemon_reload: yes
+     tags: webrelay
 
    ############ Pmacct End
 
