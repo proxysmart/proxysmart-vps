@@ -33,14 +33,14 @@ async def recv_message(websocket ) -> tuple[int, bytes] | None:
         cid_data = buf[0:4]
         cid = struct.unpack('!I', cid_data)[0]
         data = buf[4:]
-        print("<= PC", cid, data[:100] )
+        #print("<= PC", cid, data[:100] )
         return cid, data
     except (asyncio.IncompleteReadError, ConnectionResetError):
         return None
 
 async def send_message(websocket, cid: int, data: bytes):
     """Отправляет сообщение backconnect-клиенту."""
-    print('=> PC', cid, data[:100])
+    #print('=> PC', cid, data[:100])
     msg = struct.pack('!I', cid) + data
     try:
         await websocket.send (msg)
