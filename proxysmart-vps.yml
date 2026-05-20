@@ -15,6 +15,7 @@
     AUTO_HTTPS_BACKEND_PORT:    3082
     AUTO_HTTPS_PORT:            7999
     WEBRELAY_LISTEN_PORT:       2096
+    WEBRELAY_AUTH:              "bjBpfWCeP3:J0CnH4ePWi"
 
   vars_files:
     - vars.txt
@@ -636,7 +637,7 @@
           User=root
           Group=root
           Environment=PYTHONUNBUFFERED=1
-          ExecStart=/opt/webrelay.venv/bin/python3 /usr/local/bin/relay_server.py wss {{WEBRELAY_LISTEN_PORT}} {{AUTO_HTTPS_BACKEND_PORT}} -
+          ExecStart=/opt/webrelay.venv/bin/python3 /usr/local/bin/relay_server.py wss {{WEBRELAY_LISTEN_PORT}} {{AUTO_HTTPS_BACKEND_PORT}} {{AUTO_HTTPS_DOMAIN}} {{WEBRELAY_AUTH}}
           Restart=on-failure
           LimitNOFILE=1048576
 

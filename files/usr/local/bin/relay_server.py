@@ -20,6 +20,7 @@ channels = {}
 channels_lock = asyncio.Lock()
 
 domain_global=''
+auth_global=''
 
 # ----- вспомогательные функции -----
 def compute_channel_id() -> int:
@@ -49,26 +50,37 @@ async def send_message(websocket, cid: int, data: bytes):
 # ----- обработка backconnect-клиента (ПК) -----
 async def handle_backconnect_client ( websocket ):
     global domain_global
+    global auth_global
     addr = websocket.remote_address 
     w_id=  websocket.id
     print(f"[+] Backconnect connected from {addr}")
 
     try:
         # регистрация
+        client_name=''
         reg_line = await websocket.recv()
         if not reg_line:
             return
         parts = reg_line.decode().strip().split()
-        if len(parts) != 2 or parts[0] != "REGISTER":
+        #print(  parts)
+        if len(parts) != 3 or parts[0] != "REGISTER":
+            print(f"[!] Wrong initial handshake from {addr}")
             await websocket.send (b"ERROR\n")
             return
-        client_name = parts[1]
+        auth = parts[1]
+        client_name = parts[2]
 
         if domain_global!='-' and not client_name.endswith(domain_global):
             print(f"[!] cant accept this client '{client_name}', the domain must be within {domain_global}")
             await websocket.send (b"ERROR\n")
             return
 
+        #print('auth', auth)
+        if auth_global!='-' and auth!=auth_global:
+            print(f"[!] cant accept this client '{client_name}', auth not passed")
+            await websocket.send (b"ERROR\n")
+            return
+            
         async with backconnect_lock:
             bc_info = backconnect_clients.get(client_name)
             if bc_info:
@@ -115,13 +127,14 @@ async def handle_backconnect_client ( websocket ):
     finally:
         is_registered = False
 
-        async with backconnect_lock:
-            #pop() only when current writer matches dict's writer
-            bc_info = backconnect_clients.get( client_name )
-            if bc_info and bc_info[0].id  == w_id :
-                is_registered=True
-                #print( 'pop', is_registered ,  addr)
-                backconnect_clients.pop(client_name, None)
+        if client_name:
+            async with backconnect_lock:
+                #pop() only when current writer matches dict's writer
+                bc_info = backconnect_clients.get( client_name )
+                if bc_info and bc_info[0].id  == w_id :
+                    is_registered=True
+                    #print( 'pop', is_registered ,  addr)
+                    backconnect_clients.pop(client_name, None)
                 
         await websocket.close() 
         print(f"[-] Backconnect client (registered:{is_registered}) '{client_name}' disconnected {addr}")
@@ -291,10 +304,13 @@ async def start_logging():
         async with channels_lock:
             print('[?] Active channels: ',  list ( channels.keys() ) )
 
-async def main( bk_scheme='ws', port_backconnect_server=4446, port_external_tcp_proxy=3082, domain='',  ):
+async def main( bk_scheme='ws', port_backconnect_server=4446, port_external_tcp_proxy=3082, domain='', auth='', ):
     global domain_global
+    global auth_global
     if domain:
         domain_global=domain 
+    if auth:
+        auth_global=auth
     await asyncio.gather(
         start_backconnect_server( bk_scheme, '0.0.0.0',   port_backconnect_server,   ),
         start_external_tcp_proxy( '127.0.0.1', port_external_tcp_proxy, ),
@@ -303,16 +319,17 @@ async def main( bk_scheme='ws', port_backconnect_server=4446, port_external_tcp_
 
 def usage():
     print (f"""
-    Usage: relay_server.py <scheme> <port_backconnect_server> <port_external_tcp_proxy> <domain>
+    Usage: relay_server.py <scheme> <port_backconnect_server> <port_external_tcp_proxy> <domain> <auth>
         scheme      : ws or wss
         port_backconnect_server: 2096  (for backconnect clients)
         port_external_tcp_proxy:    3082  (for Web browsers)
         domain :    smth like back.com or - (hyphen) for any domain
+        auth:   login:password  or - for no auth
 """)
 
 
 if __name__ == '__main__':
-    if len(sys.argv) ==5:
+    if len(sys.argv) ==6:
         asyncio.run(main( *sys.argv[1:]     ))
     else:
         usage()
