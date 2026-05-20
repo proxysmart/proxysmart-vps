@@ -1,7 +1,8 @@
 
 haproxy_enabled: 1
 vps_socks5_udp:  1
-AUTO_HTTPS_DOMAIN:          back.com
+AUTO_HTTPS_DOMAIN:      back.com
+WEBRELAY_AUTH:          "bjBpfWCeP3:J0CnH4ePWi"
 ssh_pub_keys: 
  - PUBKEY
 
