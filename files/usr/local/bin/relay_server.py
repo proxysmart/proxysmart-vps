@@ -204,12 +204,14 @@ async def handle_external_tcp_client(reader, writer, ):
     fqdn = extract_host_from_first_data(first_chunk)
 
     client_name=''
-    if domain_global=='-':
-        client_name=fqdn
-    else:
-        m=re.search(rf'^(.+)\.{domain_global}', fqdn)
-        if m:
-            client_name=m.group(1)
+#    if domain_global=='-':
+#        client_name=fqdn
+#    else:
+#        m=re.search(rf'^(.+)\.{domain_global}', fqdn)
+#        if m:
+#            client_name=m.group(1)
+
+    client_name=fqdn
 
     if not client_name:
         writer.write(b'HTTP/1.1 400 Bad Request\r\n\r\nError\r\n')
