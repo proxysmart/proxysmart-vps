@@ -183,6 +183,7 @@
                 - rsyslog
                 - monitoring-plugins
                 - nginx
+                - python3-virtualenv
             state: present
             install_recommends: no
 
