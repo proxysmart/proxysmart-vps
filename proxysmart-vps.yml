@@ -201,6 +201,31 @@
         state: absent
      notify: [ nginx restart ] 
 
+   - name: put nginx logrotate
+     tags: [ logrotate ]
+     copy:
+        dest: /etc/logrotate.d/nginx
+        content: |
+            /var/log/nginx/*.log {
+                daily
+                missingok
+                rotate 720
+                compress
+                delaycompress
+                notifempty
+                create 0640 www-data adm
+                sharedscripts
+                prerotate
+                    if [ -d /etc/logrotate.d/httpd-prerotate ]; then \
+                        run-parts /etc/logrotate.d/httpd-prerotate; \
+                    fi \
+                endscript
+                postrotate
+                    invoke-rc.d nginx rotate >/dev/null 2>&1
+                endscript
+            }
+
+
    - name: set gost2 ver
      set_fact:
         GOST2_VER: 2.11.3
