@@ -209,7 +209,7 @@
             /var/log/nginx/*.log {
                 daily
                 missingok
-                rotate 720
+                rotate {{ logrotate_days }}
                 compress
                 delaycompress
                 notifempty
@@ -457,7 +457,7 @@
                     compress
                     notifempty
                     daily
-                    rotate 750
+                    rotate {{ logrotate_days }}
                     copytruncate
                     dateext
                     dateformat -%Y-%m-%d_%H-%M-%S
@@ -489,7 +489,7 @@
         content: |
             /var/log/haproxy.log {
                 daily
-                rotate 750
+                rotate {{ logrotate_days }}
                 missingok
                 notifempty
                 compress
