@@ -268,7 +268,7 @@
 
    - name: set gost3 ver
      set_fact:
-        GOST3_VER: 3.0.0
+        GOST3_VER: 3.2.7-nightly.20260628
      tags: gost3
 
    - name: set gost3 url
