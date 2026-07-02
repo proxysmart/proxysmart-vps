@@ -273,7 +273,7 @@
 
    - name: set gost3 url
      set_fact:
-        gost3_url: 'https://github.com/go-gost/gost/releases/download/v{{GOST3_VER}}/gost_{{GOST3_VER}}_{{ARCH}}.tar.gz'
+        gost3_url: 'https://tun1.tanatos.org/repo/gost/gost_{{GOST3_VER}}_{{ARCH}}.tar.gz'
      tags: gost3
 
    - name: Check if gost3 is installed
