@@ -405,6 +405,12 @@
      tags: ssh
 
    - name: set custom SSHD limits
+     file:
+        path: /etc/systemd/system/ssh.service.d
+        state: directory
+     tags: ssh
+
+   - name: set custom SSHD limits
      copy:
         dest: /etc/systemd/system/ssh.service.d/limits.conf
         content:  |
