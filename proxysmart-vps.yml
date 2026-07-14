@@ -404,6 +404,21 @@
      notify: sshd restart
      tags: ssh
 
+   - name: set custom SSHD limits
+     file:
+        path: /etc/systemd/system/ssh.service.d
+        state: directory
+     tags: ssh
+
+   - name: set custom SSHD limits
+     copy:
+        dest: /etc/systemd/system/ssh.service.d/limits.conf
+        content:  |
+            [Service]
+            LimitNOFILE=65536
+     notify: [  reload systemctl, sshd restart ] 
+     tags: ssh
+
    - name: create user fwd
      user:
         name: fwd
