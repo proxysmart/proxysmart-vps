@@ -104,6 +104,16 @@
           - not px.stat.exists
         fail_msg: "---                  dont run it on a server with Proxysmart. Run it on a VPS!               -"
 
+   - stat:
+        path: /opt/xproxy
+     register: xproxy_i
+
+   - name: check Xproxy VPS
+     assert:
+        that:
+          - not xproxy_i.stat.exists
+        fail_msg: "---                  dont run it on a server with Xproxy. Reinstall the OS.                 -"
+     
    - name: check architecture
      assert:
         that:
