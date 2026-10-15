@@ -658,7 +658,7 @@
         minute: "12"
         hour:   "5"
         day:    "2"
-        disabled: true
+        state: absent
 
    - name: Setup Virtualenv and Install Modules
      tags: webrelay
