@@ -47,6 +47,7 @@ do
         echo "= stop SOCKS_PORT $SOCKS_PORT because it was down $max_attempts times"
         systemctl stop gost_quic_server@$SOCKS_PORT
         rm -f /run/systemd/system/gost_quic_server@$SOCKS_PORT.service
+        rm -f /etc/systemd/system/gost_quic_server@$SOCKS_PORT.service
         some_stopped=1
     else
         echo "= SOCKS_PORT $SOCKS_PORT was down $down_occurences times, won't stop it"
