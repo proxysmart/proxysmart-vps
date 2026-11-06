@@ -91,8 +91,8 @@
      assert:
         that:
           - ansible_facts['distribution'] == "Ubuntu"
-          - ansible_facts['distribution_version'] in ["22.04", "24.04"]
-        fail_msg: "Host must be Ubuntu 22.04 or 24.04"
+          - ansible_facts['distribution_version'] in ["22.04", "24.04", "26.04" ]
+        fail_msg: "Host must be Ubuntu 22.04 or 24.04 or 26.04"
 
    - stat:
         path: '/usr/local/bin/proxysmart.sh'
