@@ -647,6 +647,7 @@
         job:  /usr/local/bin/vps_helper.sh purge_orphaned_socks_servers
         minute: "12,42"
         hour:   "*"
+        state: absent
 
    - name: Setup Virtualenv and Install Modules
      tags: webrelay
